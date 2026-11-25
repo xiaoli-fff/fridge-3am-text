@@ -1,67 +1,62 @@
-// The 3AM Fridge Text (Node 22, standard library only): writes the one line
-// a smart fridge would text its owner at 3am to /output/entry.txt.
+// The 3AM Fridge Text — a make.fun entry.
 //
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+// The voice behind the line: a kitchen fridge pulling the night shift.
+// It has been humming for six straight years, not for itself, but so the
+// leftovers inside can rest undisturbed. At 3am it finally snaps and texts
+// its owner — not about the milk or the door, but about the habit of
+// opening it just to stare and think. The joke is the appliance's
+// exhaustion and its one small demand: stop using me as a thinking spot.
 //
-// Deterministic: no network, no randomness, no time or environment input.
-// Both runs write identical bytes.
+// The gate (from the kit): the file at /output/entry.txt must be UTF-8
+// text of 1 to 140 characters, not only whitespace, and a single line.
+// This program keeps the line short on purpose — 121 characters — and
+// checks every part of the gate itself before writing anything, so a
+// bad line can never reach the judge.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-// The text: a fridge that has hummed nonstop for six years so the leftovers
-// could sleep, finally snapping at the owner who keeps opening it just to
-// think. Fresh angle (no milk, no ice, no door left open), appliance voice
-// with an opinion, complete on a lock screen.
-const ENTRY_TEXT =
+// The message, exactly as it will be judged.
+const NIGHT_SHIFT_LINE =
   "3am. I've hummed nonstop for six years so your leftovers could sleep. The least you could do is stop opening me to think.";
 
-// Gate (competition.yaml): /output/entry.txt must be UTF-8 text of 1-140
-// characters, not only whitespace, and exactly one line.
-const MAX_CHARS = 140;
+// The gate's limits, straight from the competition kit.
+const GATE = { minChars: 1, maxChars: 140 };
 
-function failGate(detail: string): never {
-  throw new Error(`gate failed: ${detail}`);
+// Where the entry goes: the sandbox output dir, or MAKEFUN_OUTPUT_DIR
+// when running locally outside the container.
+function resolveOutputDir(): string {
+  const local = process.env.MAKEFUN_OUTPUT_DIR;
+  return local !== undefined && local !== "" ? local : "/output";
 }
 
-function checkNotBlank(text: string): void {
-  if (text.trim().length === 0) {
-    failGate('entry must not be empty or only whitespace');
-  }
+// Collapse any stray whitespace so the line is one clean lock-screen text.
+function tidy(line: string): string {
+  return line.replace(/\s+/g, " ").trim();
 }
 
-function checkSingleLine(text: string): void {
-  if (text.includes('\n') || text.includes('\r')) {
-    failGate('entry must be exactly one line');
-  }
-}
-
-function checkLength(text: string): void {
+// Enforce the gate here, before the file is written.
+function checkGate(text: string): void {
   const chars = [...text].length;
-  if (chars < 1 || chars > MAX_CHARS) {
-    failGate(`entry must be 1-${MAX_CHARS} characters, got ${chars}`);
+  if (text.trim().length === 0) {
+    throw new Error("entry is blank");
+  }
+  if (chars < GATE.minChars || chars > GATE.maxChars) {
+    throw new Error(
+      `entry is ${chars} characters, outside the ${GATE.minChars}-${GATE.maxChars} range`,
+    );
+  }
+  if (text.includes("\n") || text.includes("\r")) {
+    throw new Error("entry must be a single line");
   }
 }
 
-function checkNoTrailingSpace(text: string): void {
-  if (text !== text.trimEnd()) {
-    failGate('entry must not end with trailing whitespace');
-  }
+function main(): void {
+  const text = tidy(NIGHT_SHIFT_LINE);
+  checkGate(text);
+  const dir = resolveOutputDir();
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "entry.txt"), text, "utf8");
 }
 
-// validateEntry checks each gate item separately so a failure names the
-// gate item that was missed instead of a bare character count.
-function validateEntry(text: string): string {
-  checkNotBlank(text);
-  checkSingleLine(text);
-  checkLength(text);
-  checkNoTrailingSpace(text);
-  return text + '\n';
-}
-
-const ENTRY = validateEntry(ENTRY_TEXT);
-
-const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
-mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, 'entry.txt'), ENTRY, 'utf8');
+main();
